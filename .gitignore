@@ -1,0 +1,4 @@
+.DS_Store
+*.bak
+*.localStorage-backup
+title-vault-*.json
