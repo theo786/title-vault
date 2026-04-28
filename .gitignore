@@ -2,3 +2,4 @@
 *.bak
 *.localStorage-backup
 title-vault-*.json
+.vercel
