@@ -411,6 +411,28 @@
     background: rgba(255,184,107,0.08);
   }
 
+  /* === 페이지 전체 드롭 오버레이 === */
+  .drop-overlay {
+    display: none; position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .drop-overlay.show { display: flex; }
+  .drop-box {
+    border: 3px dashed var(--accent-2);
+    border-radius: 24px;
+    padding: 60px 80px;
+    text-align: center;
+    background: rgba(255,184,107,0.1);
+  }
+  .drop-icon { font-size: 64px; margin-bottom: 16px; }
+  .drop-title {
+    font-size: 22px; font-weight: 700;
+    color: var(--accent-2); margin-bottom: 8px;
+  }
+  .drop-sub { font-size: 14px; color: var(--muted); }
+
   /* === 드롭존 / 펜딩 이미지 === */
   .add-row.drag-over {
     outline: 2px dashed var(--accent-2);
@@ -1598,24 +1620,56 @@ $('#newTitle').addEventListener('paste', e => {
   if (files.length) addPendingFiles(files);
 });
 
-// 드래그앤드롭
-const dropZone = $('#addDropZone');
-['dragenter', 'dragover'].forEach(evt => {
-  dropZone.addEventListener(evt, e => {
-    if (!e.dataTransfer?.types?.includes('Files')) return;
-    e.preventDefault(); e.stopPropagation();
-    dropZone.classList.add('drag-over');
-  });
+// 페이지 전체 드래그앤드롭 — 어디에 떨어뜨려도 OK
+let dragCounter = 0;
+function ensureDropOverlay() {
+  let ov = document.getElementById('dropOverlay');
+  if (ov) return ov;
+  ov = document.createElement('div');
+  ov.id = 'dropOverlay';
+  ov.className = 'drop-overlay';
+  ov.innerHTML = `
+    <div class="drop-box">
+      <div class="drop-icon">🖼</div>
+      <div class="drop-title">여기에 이미지 놓으세요</div>
+      <div class="drop-sub">새 타이틀 추가에 첨부됩니다</div>
+    </div>
+  `;
+  document.body.appendChild(ov);
+  return ov;
+}
+
+window.addEventListener('dragenter', e => {
+  if (!e.dataTransfer?.types?.includes('Files')) return;
+  e.preventDefault();
+  dragCounter++;
+  const ov = ensureDropOverlay();
+  ov.classList.add('show');
 });
-['dragleave', 'drop'].forEach(evt => {
-  dropZone.addEventListener(evt, e => {
-    e.preventDefault(); e.stopPropagation();
-    if (evt === 'dragleave' && dropZone.contains(e.relatedTarget)) return;
-    dropZone.classList.remove('drag-over');
-  });
+window.addEventListener('dragover', e => {
+  if (!e.dataTransfer?.types?.includes('Files')) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
 });
-dropZone.addEventListener('drop', e => {
-  if (e.dataTransfer?.files?.length) addPendingFiles(e.dataTransfer.files);
+window.addEventListener('dragleave', e => {
+  if (!e.dataTransfer?.types?.includes('Files')) return;
+  dragCounter = Math.max(0, dragCounter - 1);
+  if (dragCounter === 0) {
+    const ov = document.getElementById('dropOverlay');
+    if (ov) ov.classList.remove('show');
+  }
+});
+window.addEventListener('drop', e => {
+  if (!e.dataTransfer?.types?.includes('Files')) return;
+  e.preventDefault();
+  dragCounter = 0;
+  const ov = document.getElementById('dropOverlay');
+  if (ov) ov.classList.remove('show');
+  if (e.dataTransfer?.files?.length) {
+    addPendingFiles(e.dataTransfer.files);
+    // 드롭하면 입력창에 포커스 — 바로 타이틀 입력 가능
+    $('#newTitle')?.focus();
+  }
 });
 
 // Drive 칩 클릭 — 미연결이면 연결, 연결됨이면 해제 확인
