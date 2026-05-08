@@ -384,9 +384,96 @@
   .user-bar .sync-dot.syncing { background: var(--accent-2); animation: tv-pulse 1s infinite; }
   .user-bar .sync-dot.error { background: var(--danger); }
   @keyframes tv-pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+  /* === Drive 칩 === */
+  .drive-chip {
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--muted); padding: 5px 12px; border-radius: 999px;
+    font-size: 12px; font-family: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: all 0.15s;
+  }
+  .drive-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .drive-chip:hover { color: var(--text); border-color: var(--accent-2); }
+  .drive-chip.on { color: #6bff9c; border-color: rgba(107,255,156,0.4); background: rgba(107,255,156,0.08); }
+  .drive-chip.on .dot { background: #6bff9c; }
+
+  /* === 드롭존 / 펜딩 이미지 === */
+  .add-row.drag-over {
+    outline: 2px dashed var(--accent-2);
+    outline-offset: 4px;
+    background: rgba(255,184,107,0.05);
+    border-radius: 12px;
+  }
+  #pendingImagesWrap {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-top: 10px; padding: 10px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .pending-thumb {
+    position: relative; width: 80px; height: 80px;
+    border-radius: 8px; overflow: hidden;
+    background: var(--panel);
+  }
+  .pending-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pending-x {
+    position: absolute; top: 2px; right: 2px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(0,0,0,0.7); color: #fff; border: none;
+    cursor: pointer; font-size: 14px; line-height: 1; padding: 0;
+  }
+  .pending-x:hover { background: var(--danger); }
+
+  /* === 갤러리 (카드 옆 아이콘 + 펼치기) === */
+  .item-wrap { display: flex; flex-direction: column; }
+  .gallery-btn {
+    background: rgba(255,184,107,0.1); border: 1px solid rgba(255,184,107,0.3);
+    color: var(--accent-2); padding: 3px 8px; border-radius: 999px;
+    font-size: 12px; font-family: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px;
+    transition: all 0.12s;
+  }
+  .gallery-btn:hover { background: rgba(255,184,107,0.2); }
+  .gallery-btn.on { background: var(--accent-2); color: #181014; font-weight: 700; }
+  .gallery-btn .gn { font-size: 10px; opacity: 0.85; }
+  .gallery {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px; padding: 10px; margin: 4px 0 8px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .gthumb {
+    aspect-ratio: 1 / 1;
+    background: var(--panel); border-radius: 8px;
+    overflow: hidden; cursor: zoom-in;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .gthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .gthumb .gloading, .gthumb .gerror {
+    font-size: 11px; color: var(--muted);
+  }
+  .gthumb .gerror { color: var(--danger); }
+  .gnotice {
+    grid-column: 1 / -1;
+    color: var(--muted); font-size: 13px; padding: 12px; text-align: center;
+  }
+
+  /* === 라이트박스 === */
+  .img-lightbox {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.85);
+    align-items: center; justify-content: center;
+    cursor: zoom-out;
+  }
+  .img-lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 8px; }
+  .lb-close {
+    position: absolute; top: 18px; right: 22px;
+    background: none; border: none; color: #fff;
+    font-size: 32px; cursor: pointer;
+  }
 </style>
 </head>
 <body>
+<script src="https://accounts.google.com/gsi/client" async></script>
 
 <!-- 로그인 오버레이 (로그인 안된 상태에서만 표시) -->
 <div class="auth-overlay" id="authOverlay" style="display:none">
@@ -422,6 +509,9 @@
   <div class="user-bar" id="userBar">
     <span class="sync-dot" id="syncDot" title="동기화 상태"></span>
     <span class="email" id="userEmail"></span>
+    <button class="drive-chip" id="driveChip" type="button">
+      <span class="dot"></span><span class="label">Drive</span>
+    </button>
     <button class="logout-btn" id="logoutBtn">로그아웃</button>
   </div>
 
@@ -433,10 +523,11 @@
   <!-- 추가 (맨 위) -->
   <section class="card">
     <h2>새 타이틀 추가</h2>
-    <div class="add-row">
-      <textarea id="newTitle" rows="2" placeholder="타이틀 입력 후 Enter (여러 줄 붙여넣으면 각 줄이 따로 저장돼요)"></textarea>
+    <div class="add-row" id="addDropZone">
+      <textarea id="newTitle" rows="2" placeholder="타이틀 입력 후 Enter (여러 줄 붙여넣으면 각 줄이 따로 저장돼요. 이미지 드롭하면 첫 타이틀에 첨부)"></textarea>
       <button class="btn" id="addBtn">추가</button>
     </div>
+    <div id="pendingImagesWrap" style="display:none;"></div>
     <div class="add-toolbar">
       <button class="vip-toggle" id="vipToggle" type="button" title="켜져 있으면 추가하는 모든 타이틀이 VIP로 저장됩니다">
         👑 VIP로 추가 <span class="state">OFF</span>
@@ -653,7 +744,7 @@ const Storage = {
     setSyncStatus('syncing');
     const { data, error } = await supabase
       .from('titles')
-      .select('id, text, category, created_at')
+      .select('id, text, category, created_at, images')
       .order('created_at', { ascending: false });
     if (error) {
       console.error('loadAll error:', error);
@@ -665,7 +756,8 @@ const Storage = {
       id: d.id,
       text: d.text,
       category: d.category,
-      createdAt: Number(d.created_at)
+      createdAt: Number(d.created_at),
+      images: Array.isArray(d.images) ? d.images : []
     }));
   },
   async insertMany(newItems) {
@@ -676,10 +768,17 @@ const Storage = {
       text: i.text,
       category: i.category,
       created_at: i.createdAt,
+      images: i.images || [],
       user_id: currentUser.id
     }));
     const { error } = await supabase.from('titles').insert(rows);
     if (error) { console.error('insert error:', error); setSyncStatus('error'); alert('저장 실패: ' + error.message); return; }
+    setSyncStatus('idle');
+  },
+  async updateImages(id, images) {
+    setSyncStatus('syncing');
+    const { error } = await supabase.from('titles').update({ images }).eq('id', id);
+    if (error) { console.error('updateImages error:', error); setSyncStatus('error'); return; }
     setSyncStatus('idle');
   },
   async deleteOne(id) {
@@ -707,6 +806,244 @@ let randomCategory = 'all';
 let searchQuery = '';
 
 const $ = (sel) => document.querySelector(sel);
+
+/* ============================================================
+ * Google Drive (lazy connection)
+ * ============================================================ */
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const DRIVE_FOLDER_NAME = 'WPMT-Title-Vault';
+// brand-vault와 동일한 OAuth Client ID — 토큰 공유 가능
+const DRIVE_CLIENT_ID = '369458922583-kjr260i5i1voscrr2gvra8a5cv1ug4nu.apps.googleusercontent.com';
+
+let driveToken = null;
+let driveConnected = false;
+let driveFolderId = null;
+const mediaCache = new Map();
+const expandedGalleries = new Set();
+
+function getDriveLoginHint() { return localStorage.getItem('wpmt_drive_login_hint') || ''; }
+function setDriveLoginHint(email) { if (email) localStorage.setItem('wpmt_drive_login_hint', email); }
+function saveDriveToken(t) { localStorage.setItem('wpmt_drive_token', JSON.stringify(t)); }
+function loadDriveToken() {
+  try {
+    const t = JSON.parse(localStorage.getItem('wpmt_drive_token') || 'null');
+    return (t && Date.now() < t.expires_at) ? t : null;
+  } catch { return null; }
+}
+
+function updateDriveChip() {
+  const chip = $('#driveChip');
+  if (!chip) return;
+  chip.classList.toggle('on', driveConnected);
+  chip.title = driveConnected
+    ? 'Drive 연결됨 — 클릭하여 해제'
+    : 'Drive 미연결 — 클릭하여 연결';
+  chip.querySelector('.label').textContent = driveConnected ? 'Drive ON' : 'Drive';
+}
+
+function ensureDriveToken(forcePopup = false) {
+  if (!forcePopup) {
+    if (driveToken && Date.now() < driveToken.expires_at) return Promise.resolve(driveToken.access_token);
+    const saved = loadDriveToken();
+    if (saved) { driveToken = saved; return Promise.resolve(saved.access_token); }
+  }
+  return new Promise((resolve, reject) => {
+    if (!window.google?.accounts?.oauth2) { reject(new Error('gis_not_loaded')); return; }
+    const loginHint = getDriveLoginHint();
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: DRIVE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      hint: loginHint || undefined,
+      callback: async (resp) => {
+        if (resp.error) { reject(new Error(resp.error)); return; }
+        driveToken = {
+          access_token: resp.access_token,
+          expires_at: Date.now() + (parseInt(resp.expires_in) - 60) * 1000,
+        };
+        saveDriveToken(driveToken);
+        if (!loginHint) {
+          try {
+            const info = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+              headers: { Authorization: `Bearer ${resp.access_token}` }
+            }).then(r => r.json());
+            setDriveLoginHint(info.email);
+          } catch {}
+        }
+        resolve(driveToken.access_token);
+      },
+    });
+    client.requestAccessToken({ prompt: forcePopup ? 'consent' : '' });
+  });
+}
+
+async function driveRequest(url, options = {}) {
+  const token = await ensureDriveToken(false);
+  const res = await fetch(url, {
+    ...options,
+    headers: { Authorization: `Bearer ${token}`, ...options.headers },
+  });
+  if (res.status === 401) {
+    driveToken = null;
+    localStorage.removeItem('wpmt_drive_token');
+    // silent refresh 시도 — popup 없이 갱신 (hint 있으면 자동)
+    const t2 = await ensureDriveToken(false);
+    driveConnected = true;
+    updateDriveChip();
+    scheduleDriveRefresh();
+    return fetch(url, { ...options, headers: { Authorization: `Bearer ${t2}`, ...options.headers } });
+  }
+  return res;
+}
+
+async function getDriveFolderId() {
+  if (driveFolderId) return driveFolderId;
+  const q = encodeURIComponent(`name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const r = await driveRequest(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
+  const { files } = await r.json();
+  if (files?.length) { driveFolderId = files[0].id; return driveFolderId; }
+  const cr = await driveRequest('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' }),
+  });
+  const folder = await cr.json();
+  driveFolderId = folder.id;
+  return driveFolderId;
+}
+
+async function uploadImageToDrive(file) {
+  const folderId = await getDriveFolderId();
+  const token = await ensureDriveToken(false);
+  const meta = { name: file.name || `image_${Date.now()}.png`, parents: [folderId] };
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+  form.append('file', file);
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error('upload failed: ' + res.status);
+  return res.json(); // { id, name, mimeType }
+}
+
+async function fetchDriveImageUrl(fileId) {
+  if (mediaCache.has(fileId)) return mediaCache.get(fileId);
+  const token = await ensureDriveToken(false);
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('fetch image failed: ' + res.status);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  mediaCache.set(fileId, url);
+  return url;
+}
+
+async function deleteDriveImage(fileId) {
+  try {
+    await driveRequest(`https://www.googleapis.com/drive/v3/files/${fileId}`, { method: 'DELETE' });
+  } catch (e) { console.warn('drive delete failed:', e); }
+  if (mediaCache.has(fileId)) { URL.revokeObjectURL(mediaCache.get(fileId)); mediaCache.delete(fileId); }
+}
+
+let driveRefreshTimer = null;
+function scheduleDriveRefresh() {
+  if (driveRefreshTimer) { clearTimeout(driveRefreshTimer); driveRefreshTimer = null; }
+  if (!driveToken) return;
+  // 만료 1분 전에 silent refresh
+  const ms = Math.max(10_000, driveToken.expires_at - Date.now() - 60_000);
+  driveRefreshTimer = setTimeout(async () => {
+    try {
+      await silentRefreshDrive();
+      scheduleDriveRefresh();
+    } catch (e) {
+      // 실패해도 driveConnected는 그대로 — 다음 실제 사용 시점에 다시 시도됨
+      console.warn('drive silent refresh failed:', e);
+    }
+  }, ms);
+}
+
+// GIS의 prompt:''은 사용자가 이미 grant한 경우 거의 invisible (hint 있으면 multi-account에서도 자동)
+async function silentRefreshDrive() {
+  if (!getDriveLoginHint()) throw new Error('no hint — needs interactive');
+  if (!window.google?.accounts?.oauth2) {
+    // GIS 아직 로드 전 — 잠깐 기다려보기
+    await new Promise(r => setTimeout(r, 800));
+    if (!window.google?.accounts?.oauth2) throw new Error('gis_not_loaded');
+  }
+  await ensureDriveToken(false); // forcePopup=false → prompt:'' (silent)
+  driveConnected = true;
+  updateDriveChip();
+}
+
+// 페이지 로드 시 — popup 없이 토큰 살아있으면 즉시 연결, 만료/없음이면 silent refresh 시도
+async function tryQuietConnectDrive() {
+  const saved = loadDriveToken();
+  if (saved) {
+    driveToken = saved;
+    driveConnected = true;
+    updateDriveChip();
+    scheduleDriveRefresh();
+    return;
+  }
+  // 저장된 hint가 있다 = 한 번 이상 연결한 적 있음 → silent refresh 시도
+  if (getDriveLoginHint()) {
+    try {
+      await silentRefreshDrive();
+      scheduleDriveRefresh();
+      return;
+    } catch (e) {
+      console.warn('initial silent refresh failed:', e);
+    }
+  }
+  driveConnected = false;
+  updateDriveChip();
+}
+
+async function connectDriveInteractive() {
+  try {
+    updateDriveChip();
+    // 먼저 silent로 시도 — hint 있으면 popup 없이 갱신 가능
+    if (getDriveLoginHint() && !driveToken) {
+      try {
+        await ensureDriveToken(false);
+        driveConnected = true;
+        updateDriveChip();
+        scheduleDriveRefresh();
+        return true;
+      } catch {}
+    }
+    await ensureDriveToken(true);
+    driveConnected = true;
+    updateDriveChip();
+    scheduleDriveRefresh();
+    flashHint('✓ Drive 연결됨');
+    return true;
+  } catch (e) {
+    driveConnected = false;
+    updateDriveChip();
+    flashHint('Drive 연결 실패');
+    return false;
+  }
+}
+
+function disconnectDrive() {
+  driveToken = null;
+  driveConnected = false;
+  if (driveRefreshTimer) { clearTimeout(driveRefreshTimer); driveRefreshTimer = null; }
+  localStorage.removeItem('wpmt_drive_token');
+  mediaCache.forEach(url => URL.revokeObjectURL(url));
+  mediaCache.clear();
+  updateDriveChip();
+  flashHint('Drive 연결 해제됨');
+}
+
+// Supabase 로그아웃 시에만 hint도 같이 비움 (사용자가 다시 로그인하면 본인 계정 다시 선택 가능하게)
+function disconnectDriveOnLogout() {
+  disconnectDrive();
+  localStorage.removeItem('wpmt_drive_login_hint');
+}
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function escapeHtml(s) {
@@ -736,14 +1073,72 @@ function updateToggles() {
   hit.querySelector('.state').textContent = hitMode ? 'ON' : 'OFF';
 }
 
+// 펜딩 이미지: 추가 버튼 누를 때 Drive에 업로드하고 첫 타이틀에 첨부
+let pendingImages = []; // [{ file, previewUrl }]
+
+function renderPendingImages() {
+  const wrap = $('#pendingImagesWrap');
+  if (!wrap) return;
+  if (!pendingImages.length) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+  wrap.style.display = 'flex';
+  wrap.innerHTML = pendingImages.map((p, idx) => `
+    <div class="pending-thumb">
+      <img src="${p.previewUrl}" alt="" />
+      <button class="pending-x" data-idx="${idx}" title="제거">×</button>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('.pending-x').forEach(b => {
+    b.addEventListener('click', () => {
+      const i = Number(b.dataset.idx);
+      const p = pendingImages[i];
+      if (p) URL.revokeObjectURL(p.previewUrl);
+      pendingImages.splice(i, 1);
+      renderPendingImages();
+    });
+  });
+}
+
+function addPendingFiles(files) {
+  const imgs = Array.from(files || []).filter(f => f.type.startsWith('image/'));
+  if (!imgs.length) return;
+  for (const f of imgs) {
+    pendingImages.push({ file: f, previewUrl: URL.createObjectURL(f) });
+  }
+  renderPendingImages();
+}
+
 async function addItem() {
   const raw = $('#newTitle').value;
   const titles = parseTitles(raw);
-  if (!titles.length) return;
+  if (!titles.length && !pendingImages.length) return;
+  if (!titles.length && pendingImages.length) { flashHint('타이틀도 같이 입력해주세요'); return; }
+
+  // 이미지 업로드 — Drive 연결 필요
+  let uploadedImages = [];
+  if (pendingImages.length) {
+    if (!driveConnected) {
+      flashHint('Drive 연결 필요 — 연결 중…');
+      const ok = await connectDriveInteractive();
+      if (!ok) return;
+    }
+    flashHint(`이미지 ${pendingImages.length}개 업로드 중…`);
+    try {
+      for (const p of pendingImages) {
+        const r = await uploadImageToDrive(p.file);
+        uploadedImages.push({ file_id: r.id, name: r.name, mime_type: r.mimeType });
+      }
+    } catch (e) {
+      console.error('upload error:', e);
+      flashHint('이미지 업로드 실패');
+      return;
+    }
+  }
+
   let vipCount = 0, hitCount = 0;
   const newOnes = [];
+  let firstAttached = false;
   for (let text of titles) {
-    let forced = null; // 'vip' | 'hitword' | null
+    let forced = null;
     if (text.startsWith('*')) {
       text = text.replace(/^\*+\s*/, '').trim();
       if (!text) continue;
@@ -754,14 +1149,23 @@ async function addItem() {
     const category = forced || classify(text);
     if (forced === 'vip') vipCount++;
     if (forced === 'hitword') hitCount++;
-    const item = { id: uid(), text, category, createdAt: Date.now() };
+    const images = (!firstAttached && uploadedImages.length) ? uploadedImages : [];
+    if (images.length) firstAttached = true;
+    const item = { id: uid(), text, category, createdAt: Date.now(), images };
     newOnes.push(item);
     items.unshift(item);
   }
+
+  // 펜딩 이미지 정리
+  pendingImages.forEach(p => URL.revokeObjectURL(p.previewUrl));
+  pendingImages = [];
+  renderPendingImages();
   $('#newTitle').value = '';
+
   const extras = [];
   if (vipCount) extras.push(`👑 ${vipCount}`);
   if (hitCount) extras.push(`🔥 ${hitCount}`);
+  if (uploadedImages.length) extras.push(`🖼 ${uploadedImages.length}`);
   const tail = extras.length ? ` (${extras.join(' · ')})` : '';
   flashHint(`✓ ${titles.length}개 추가됨${tail}`);
   render();
@@ -922,15 +1326,43 @@ function itemHtml(i) {
     `<option value="${c.key}" ${c.key===i.category?'selected':''}>${c.label}</option>`
   ).join('');
   const crown = markPrefix(i.category);
+  const hasImages = Array.isArray(i.images) && i.images.length > 0;
+  const isExpanded = expandedGalleries.has(i.id);
+  const galleryBtn = hasImages
+    ? `<button class="gallery-btn ${isExpanded ? 'on' : ''}" data-gid="${i.id}" title="이미지 ${i.images.length}장 보기">🖼<span class="gn">${i.images.length}</span></button>`
+    : '';
   return `
-    <div class="item">
-      <span class="title">${crown}${escapeHtml(i.text)}</span>
-      <span class="cat-pill" style="${pillStyle(i.category)}">
-        <select data-id="${i.id}" class="cat-select">${opts}</select>
-      </span>
-      <button class="del" data-id="${i.id}" title="삭제">×</button>
+    <div class="item-wrap">
+      <div class="item">
+        <span class="title">${crown}${escapeHtml(i.text)}</span>
+        ${galleryBtn}
+        <span class="cat-pill" style="${pillStyle(i.category)}">
+          <select data-id="${i.id}" class="cat-select">${opts}</select>
+        </span>
+        <button class="del" data-id="${i.id}" title="삭제">×</button>
+      </div>
+      ${hasImages && isExpanded ? `<div class="gallery" data-gid-grid="${i.id}">${
+        driveConnected
+          ? i.images.map((img, idx) => `<div class="gthumb" data-fid="${img.file_id}" data-tid="${i.id}" data-idx="${idx}"><div class="gloading">로딩…</div></div>`).join('')
+          : `<div class="gnotice">🔗 Drive 미연결 — 위쪽 'Drive' 버튼을 눌러 연결해주세요</div>`
+      }</div>` : ''}
     </div>
   `;
+}
+
+async function loadGalleryThumbs(titleId) {
+  const grid = document.querySelector(`[data-gid-grid="${titleId}"]`);
+  if (!grid) return;
+  const thumbs = grid.querySelectorAll('.gthumb');
+  for (const t of thumbs) {
+    const fid = t.dataset.fid;
+    try {
+      const url = await fetchDriveImageUrl(fid);
+      t.innerHTML = `<img src="${url}" alt="" />`;
+    } catch (e) {
+      t.innerHTML = `<div class="gerror">로드 실패</div>`;
+    }
+  }
 }
 
 function render() {
@@ -974,6 +1406,52 @@ function render() {
   content.querySelectorAll('.cat-select').forEach(sel =>
     sel.addEventListener('change', e => changeCategory(sel.dataset.id, e.target.value))
   );
+  content.querySelectorAll('.gallery-btn').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.gid;
+      if (expandedGalleries.has(id)) {
+        expandedGalleries.delete(id);
+        render();
+        return;
+      }
+      // 펼치기 시도 — Drive 미연결이면 즉시 연결 popup
+      if (!driveConnected) {
+        const ok = await connectDriveInteractive();
+        if (!ok) return;
+      }
+      expandedGalleries.add(id);
+      render();
+      loadGalleryThumbs(id);
+    })
+  );
+  // 이미 펼쳐진 갤러리는 (재렌더 후) 이미지 다시 로드
+  expandedGalleries.forEach(id => {
+    if (driveConnected) loadGalleryThumbs(id);
+  });
+  // 썸네일 클릭 → 큰 이미지 보기 (라이트박스)
+  content.querySelectorAll('.gthumb').forEach(t =>
+    t.addEventListener('click', () => {
+      const fid = t.dataset.fid;
+      const url = mediaCache.get(fid);
+      if (url) openLightbox(url);
+    })
+  );
+}
+
+function openLightbox(url) {
+  let lb = document.getElementById('imgLightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'imgLightbox';
+    lb.className = 'img-lightbox';
+    lb.innerHTML = '<img alt="" /><button class="lb-close" type="button">×</button>';
+    document.body.appendChild(lb);
+    lb.addEventListener('click', e => {
+      if (e.target === lb || e.target.classList.contains('lb-close')) lb.style.display = 'none';
+    });
+  }
+  lb.querySelector('img').src = url;
+  lb.style.display = 'flex';
 }
 
 /* ============================================================
@@ -1081,6 +1559,53 @@ $('#addBtn').addEventListener('click', addItem);
 $('#newTitle').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addItem(); }
 });
+
+// 클립보드 이미지 붙여넣기
+$('#newTitle').addEventListener('paste', e => {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  const files = [];
+  for (const it of items) {
+    if (it.kind === 'file' && it.type.startsWith('image/')) {
+      const f = it.getAsFile();
+      if (f) files.push(f);
+    }
+  }
+  if (files.length) addPendingFiles(files);
+});
+
+// 드래그앤드롭
+const dropZone = $('#addDropZone');
+['dragenter', 'dragover'].forEach(evt => {
+  dropZone.addEventListener(evt, e => {
+    if (!e.dataTransfer?.types?.includes('Files')) return;
+    e.preventDefault(); e.stopPropagation();
+    dropZone.classList.add('drag-over');
+  });
+});
+['dragleave', 'drop'].forEach(evt => {
+  dropZone.addEventListener(evt, e => {
+    e.preventDefault(); e.stopPropagation();
+    if (evt === 'dragleave' && dropZone.contains(e.relatedTarget)) return;
+    dropZone.classList.remove('drag-over');
+  });
+});
+dropZone.addEventListener('drop', e => {
+  if (e.dataTransfer?.files?.length) addPendingFiles(e.dataTransfer.files);
+});
+
+// Drive 칩 클릭 — 미연결이면 연결, 연결됨이면 해제 확인
+$('#driveChip').addEventListener('click', async () => {
+  if (driveConnected) {
+    if (confirm('Drive 연결을 해제할까요? (이미지가 첨부된 타이틀의 갤러리는 다시 연결할 때까지 안 보여요)')) {
+      disconnectDrive();
+      render();
+    }
+  } else {
+    await connectDriveInteractive();
+    render();
+  }
+});
 $('#vipToggle').addEventListener('click', () => {
   vipMode = !vipMode;
   if (vipMode) hitMode = false; // 상호 배타적
@@ -1187,7 +1712,7 @@ async function verifyOtpCode() {
 
 async function logout() {
   await supabase.auth.signOut();
-  // onAuthStateChange가 처리하지만 즉시 UI 업데이트
+  disconnectDriveOnLogout();
   currentUser = null;
   items = [];
   showApp(false);
@@ -1202,6 +1727,8 @@ async function initApp(user) {
   currentUser = user;
   $('#userEmail').textContent = user.email;
   showApp(true);
+  // Drive — popup 없이 토큰만 체크
+  tryQuietConnectDrive();
   // 데이터 로드
   items = await Storage.loadAll();
   // 카테고리 마이그레이션 (옛 데이터 보호)
