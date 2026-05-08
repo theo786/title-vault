@@ -398,6 +398,19 @@
   .drive-chip.on { color: #6bff9c; border-color: rgba(107,255,156,0.4); background: rgba(107,255,156,0.08); }
   .drive-chip.on .dot { background: #6bff9c; }
 
+  /* === 추가 폼 액션 === */
+  .add-actions { display: flex; flex-direction: column; gap: 6px; }
+  .image-add-btn {
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--muted); padding: 8px 14px; border-radius: 10px;
+    font-size: 13px; font-family: inherit; cursor: pointer;
+    white-space: nowrap; transition: all 0.15s;
+  }
+  .image-add-btn:hover {
+    color: var(--accent-2); border-color: var(--accent-2);
+    background: rgba(255,184,107,0.08);
+  }
+
   /* === 드롭존 / 펜딩 이미지 === */
   .add-row.drag-over {
     outline: 2px dashed var(--accent-2);
@@ -524,8 +537,12 @@
   <section class="card">
     <h2>새 타이틀 추가</h2>
     <div class="add-row" id="addDropZone">
-      <textarea id="newTitle" rows="2" placeholder="타이틀 입력 후 Enter (여러 줄 붙여넣으면 각 줄이 따로 저장돼요. 이미지 드롭하면 첫 타이틀에 첨부)"></textarea>
-      <button class="btn" id="addBtn">추가</button>
+      <textarea id="newTitle" rows="2" placeholder="타이틀 입력 후 Enter (여러 줄 붙여넣으면 각 줄이 따로 저장돼요)"></textarea>
+      <div class="add-actions">
+        <button class="image-add-btn" id="imageAddBtn" type="button" title="이미지 첨부 (드래그·⌘V도 OK)">📷 사진</button>
+        <button class="btn" id="addBtn">추가</button>
+      </div>
+      <input type="file" id="imageFileInput" accept="image/*" multiple style="display:none;" />
     </div>
     <div id="pendingImagesWrap" style="display:none;"></div>
     <div class="add-toolbar">
@@ -539,7 +556,7 @@
       </button>
     </div>
     <div class="add-hint" id="addHint">
-      Enter = 추가 · Shift+Enter = 줄바꿈 · 앞에 <code>*</code> 또는 위 토글로 👑 VIP · 빈 줄/구분선(<code>-</code>, <code>=</code>) 자동 무시
+      Enter = 추가 · Shift+Enter = 줄바꿈 · 앞에 <code>*</code> 또는 위 토글로 👑 VIP · 빈 줄/구분선(<code>-</code>, <code>=</code>) 자동 무시 · 📷 버튼으로 이미지 첨부 (드래그·⌘V도 가능)
     </div>
   </section>
 
@@ -1558,6 +1575,13 @@ function importJson(file) {
 $('#addBtn').addEventListener('click', addItem);
 $('#newTitle').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addItem(); }
+});
+
+// 사진 첨부 버튼 → 파일 선택 dialog
+$('#imageAddBtn').addEventListener('click', () => $('#imageFileInput').click());
+$('#imageFileInput').addEventListener('change', e => {
+  if (e.target.files?.length) addPendingFiles(e.target.files);
+  e.target.value = ''; // 같은 파일 재선택 가능하도록
 });
 
 // 클립보드 이미지 붙여넣기
